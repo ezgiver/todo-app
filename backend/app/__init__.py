@@ -1,12 +1,25 @@
-from flask import Flask, jsonify
+import os
+
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 
 from .extensions import db
+from .routes.health import health_bp
 from .routes.todos import todos_bp
 
 
 def create_app(config_object: str = "config.DevelopmentConfig") -> Flask:
-    app = Flask(__name__, instance_relative_config=True)
+    static_root = os.environ.get("STATIC_ROOT")
+    has_spa = bool(static_root) and os.path.isfile(
+        os.path.join(static_root, "index.html")
+    )
+
+    kwargs = {"instance_relative_config": True}
+    if has_spa:
+        kwargs["static_folder"] = static_root
+        kwargs["static_url_path"] = "/static"
+
+    app = Flask(__name__, **kwargs)
     app.config.from_object(config_object)
 
     _ensure_instance_folder(app)
@@ -19,7 +32,11 @@ def create_app(config_object: str = "config.DevelopmentConfig") -> Flask:
         supports_credentials=False,
     )
 
+    app.register_blueprint(health_bp, url_prefix="/api/health")
     app.register_blueprint(todos_bp, url_prefix="/api/todos")
+
+    if has_spa:
+        _register_spa(app)
 
     _register_error_handlers(app)
 
@@ -32,10 +49,21 @@ def create_app(config_object: str = "config.DevelopmentConfig") -> Flask:
 
 def _ensure_instance_folder(app: Flask) -> None:
     try:
-        import os
         os.makedirs(app.instance_path, exist_ok=True)
     except OSError:
         pass
+
+
+def _register_spa(app: Flask) -> None:
+    """Serve the built React app + fall back to index.html for client-side routing."""
+
+    @app.route("/", defaults={"path": ""})
+    @app.route("/<path:path>")
+    def spa(path: str):
+        candidate = os.path.join(app.static_folder, path)
+        if path and os.path.isfile(candidate):
+            return send_from_directory(app.static_folder, path)
+        return send_from_directory(app.static_folder, "index.html")
 
 
 def _register_error_handlers(app: Flask) -> None:
