@@ -1,0 +1,15 @@
+.git
+.gitignore
+.github
+.venv
+node_modules
+frontend/dist
+backend/instance
+backend/.pytest_cache
+backend/.venv
+**/__pycache__
+**/*.pyc
+**/.env
+**/.env.local
+README.md
+docker-compose.yml

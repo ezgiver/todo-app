@@ -1,3 +1,4 @@
+from .health import health_bp
 from .todos import todos_bp
 
-__all__ = ["todos_bp"]
+__all__ = ["health_bp", "todos_bp"]
