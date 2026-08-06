@@ -1,0 +1,22 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      # SQLite lives in the named volume so todos survive restarts.
+      DATABASE_URL: sqlite:////app/instance/todo.db
+    volumes:
+      - backend-data:/app/instance
+    expose:
+      - "5001"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  backend-data:

@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Env files
+.env
+
+# Flask instance folder (holds SQLite db)
+instance/
+*.db
+*.sqlite
+*.sqlite3

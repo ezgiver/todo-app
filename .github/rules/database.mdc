@@ -1,0 +1,93 @@
+---
+description: Database and SQLAlchemy patterns for persistent todo data
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# Database Rules
+
+## Stack
+
+- Use **SQLAlchemy** via **Flask-SQLAlchemy** with **SQLite** for local dev.
+- Store the DB file outside git (e.g. `instance/todo.db`). Add `instance/` to `.gitignore`.
+
+## Models
+
+- One class per table; include `id`, timestamps, and a `to_dict()` for JSON serialization.
+
+```python
+# ✅ GOOD — Todo model
+class Todo(db.Model):
+    __tablename__ = "todos"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    completed = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(
+        db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "completed": self.completed,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+```
+
+## Sessions and transactions
+
+```python
+# ✅ GOOD — commit on success, rollback on failure
+todo = Todo(title=title)
+db.session.add(todo)
+try:
+    db.session.commit()
+except SQLAlchemyError:
+    db.session.rollback()
+    raise
+return todo
+```
+
+- Call `db.session.commit()` once per request action, not after every line.
+- Use `db.session.get(Todo, id)` instead of deprecated `.query.get()`.
+
+## Queries
+
+```python
+# ❌ BAD — SQL injection risk
+db.session.execute(f"SELECT * FROM todos WHERE id = {todo_id}")
+
+# ✅ GOOD — parameterized ORM
+todo = db.session.get(Todo, todo_id)
+if todo is None:
+    return jsonify({"error": "not found"}), 404
+```
+
+- Filter and order in the database, not in Python after fetching all rows.
+- Add indexes on columns you filter often (`completed`, `created_at`).
+
+## Migrations
+
+- Use **Flask-Migrate** (Alembic) once the schema stabilizes — never edit production tables by hand.
+- One migration per logical change; review generated scripts before applying.
+
+## Schema design for todos
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | Integer PK | Auto-increment |
+| title | String(255) | Required, trimmed |
+| completed | Boolean | Default `False` |
+| created_at | DateTime | Set on insert |
+| updated_at | DateTime | Update on change |
+
+## Bad habits to avoid
+
+- Storing JSON blobs when relational columns fit (`completed` as a column, not inside JSON).
+- Leaving `db.session.commit()` out after writes (changes silently lost).
+- Creating a new engine/session per request manually — use Flask-SQLAlchemy's scoped session.
+- Deleting rows without confirming the ID exists (return 404 instead of no-op success).
+- Committing `.db` files or seed data with real user content.

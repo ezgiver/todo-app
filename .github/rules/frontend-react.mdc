@@ -1,0 +1,102 @@
+---
+description: React and Vite frontend conventions for the todo SPA
+globs: frontend/**/*.{jsx,js,css}
+alwaysApply: false
+---
+
+# Frontend Rules
+
+## Structure
+
+```
+frontend/src/
+  components/     # Reusable UI (TodoItem, TodoForm)
+  hooks/          # useTodos.js — data fetching and state
+  api/            # fetch wrappers (todos.js)
+  App.jsx
+  main.jsx
+```
+
+- One component per file; filename matches component name (`TodoList.jsx`).
+- Colocate component-specific CSS only when tiny; prefer shared styles in `index.css`.
+
+## Components
+
+```jsx
+// ✅ GOOD — small, focused, typed props via JSDoc if not using TypeScript
+/**
+ * @param {{ todo: { id: number, title: string, completed: boolean }, onToggle: (id: number) => void }} props
+ */
+export function TodoItem({ todo, onToggle }) {
+  return (
+    <li>
+      <input
+        type="checkbox"
+        checked={todo.completed}
+        onChange={() => onToggle(todo.id)}
+        aria-label={`Mark "${todo.title}" as ${todo.completed ? 'incomplete' : 'complete'}`}
+      />
+      <span className={todo.completed ? 'completed' : undefined}>{todo.title}</span>
+    </li>
+  )
+}
+```
+
+- Use function components and hooks only — no class components.
+- Extract `useTodos()` hook when more than one component needs todo state.
+
+## Data fetching
+
+- Centralize API calls in `src/api/` — components should not hardcode URLs.
+
+```javascript
+// ✅ GOOD — api/todos.js
+const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api'
+
+export async function fetchTodos() {
+  const res = await fetch(`${BASE}/todos`)
+  if (!res.ok) throw new Error('Failed to load todos')
+  return res.json()
+}
+```
+
+- Handle loading, empty, and error states in the UI — never assume fetch succeeds.
+- Use `async/await` with try/catch; show a user-friendly message on failure.
+
+## State
+
+```jsx
+// ❌ BAD — mutating state directly
+todos.push(newTodo)
+setTodos(todos)
+
+// ✅ GOOD — immutable update
+setTodos((prev) => [...prev, newTodo])
+```
+
+- Prefer lifting state only as high as needed; avoid prop drilling past 2 levels — use context or a hook.
+
+## Styling
+
+- Aim for clean, practical UI: clear spacing, readable font size (16px base), visible focus states.
+- Use CSS variables in `:root` for colors so theming stays consistent.
+- Mobile-first or at least responsive down to 320px width.
+
+## Accessibility
+
+- Every form input needs a `<label>` or `aria-label`.
+- Use semantic HTML: `<main>`, `<ul>`, `<button type="button">` (not `<div onClick>`).
+- Keyboard: todos must be toggled and submitted without a mouse.
+
+## Tooling
+
+- Run `npm run lint` before committing; fix oxlint errors.
+- Use `VITE_API_URL` env var for the backend base URL — never hardcode production URLs.
+
+## Bad habits to avoid
+
+- Fetching inside every component render — fetch in `useEffect` or event handlers.
+- Missing dependency arrays or stale closures in hooks.
+- Inline styles for everything — use classes for repeated patterns.
+- Ignoring loading spinners and empty states ("No todos yet").
+- Duplicating validation that already exists on the backend (frontend validation is UX only).

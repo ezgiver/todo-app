@@ -1,0 +1,64 @@
+---
+description: Project-wide standards and habits every contributor must follow
+alwaysApply: true
+---
+
+# General Best Practices
+
+## Project layout
+
+- `backend/` — Flask JSON API only; no HTML templates for the SPA.
+- `frontend/` — React + Vite SPA; talks to the API over HTTP.
+- Keep backend and frontend changes in separate commits when possible.
+
+## Environment and secrets
+
+```python
+# ❌ BAD — hardcoded secrets or URLs
+DATABASE_URL = "postgresql://user:pass@prod/db"
+
+# ✅ GOOD — load from environment with sensible dev defaults
+import os
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///todo.db")
+```
+
+- Never commit `.env`, API keys, or local database files.
+- Add new env vars to `.env.example` with placeholder values.
+
+## Git and workflow
+
+- Write small, focused commits with clear messages (`feat: add todo toggle endpoint`).
+- Run linters before pushing: `uv run ruff check` (backend), `npm run lint` (frontend).
+- Do not commit `node_modules/`, `.venv/`, `__pycache__/`, or build artifacts.
+
+## Code quality
+
+- Prefer readable code over clever one-liners.
+- Name things for what they do: `get_todos`, `TodoList`, not `data` or `handler2`.
+- Delete dead code instead of commenting it out.
+- Copy-paste twice → extract a shared function or component.
+
+## API contract
+
+- Backend returns JSON; frontend consumes JSON. Keep field names consistent (`snake_case` in API, map in frontend if needed).
+- Document new endpoints in `backend/README.md` (method, path, request/response shape).
+
+## Error handling
+
+- Fail loudly in development; return structured errors to the client in production.
+- Never swallow exceptions with bare `except:` or empty `catch {}`.
+
+## Testing mindset
+
+- Manually verify the happy path and one failure case before opening a PR.
+- Add automated tests for business logic and API routes as the app grows.
+
+## Bad habits to avoid
+
+| Avoid | Do instead |
+|-------|------------|
+| Giant files (500+ lines) | Split by feature: routes, models, components |
+| Magic numbers/strings | Named constants or enums |
+| Changing unrelated code in the same PR | One concern per change |
+| Skipping validation on user input | Validate on backend always; mirror on frontend for UX |
+| Assuming the frontend is trusted | Treat every API input as hostile |

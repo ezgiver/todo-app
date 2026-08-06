@@ -1,0 +1,101 @@
+---
+description: Flask API conventions for the todo app backend
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# Flask Backend Rules
+
+## App structure
+
+Use an application factory and blueprints — not a single 500-line `main.py`.
+
+```
+backend/
+  app/
+    __init__.py      # create_app()
+    models/          # SQLAlchemy models
+    routes/          # Blueprints (e.g. todos.py)
+    schemas/         # Request/response validation (optional)
+  config.py
+  wsgi.py            # entry point for production
+```
+
+```python
+# ✅ GOOD — factory pattern
+def create_app(config=None):
+    app = Flask(__name__)
+    app.config.from_object(config or "config.DevelopmentConfig")
+    db.init_app(app)
+    app.register_blueprint(todos_bp, url_prefix="/api/todos")
+    return app
+```
+
+## Routes and responses
+
+- REST-ish URLs: `GET /api/todos`, `POST /api/todos`, `PATCH /api/todos/<id>`.
+- Always return JSON with correct status codes.
+
+```python
+# ❌ BAD
+@app.route("/todo")
+def todo():
+    return str(todo_list)  # not JSON, wrong type
+
+# ✅ GOOD
+@todos_bp.get("/")
+def list_todos():
+    todos = Todo.query.order_by(Todo.created_at.desc()).all()
+    return jsonify([t.to_dict() for t in todos]), 200
+```
+
+| Action | Status |
+|--------|--------|
+| GET success | 200 |
+| POST created | 201 |
+| PATCH success | 200 |
+| DELETE success | 204 (no body) |
+| Not found | 404 |
+| Validation error | 400 |
+| Server error | 500 |
+
+## Request validation
+
+- Read JSON with `request.get_json(silent=True)` and validate before touching the DB.
+- Reject missing or empty `title` on create/update.
+
+```python
+# ✅ GOOD
+data = request.get_json(silent=True) or {}
+title = (data.get("title") or "").strip()
+if not title:
+    return jsonify({"error": "title is required"}), 400
+```
+
+## Database access in routes
+
+- Keep routes thin: validate → call model/service → return JSON.
+- Do not run raw SQL strings; use the ORM (see database rules).
+
+## CORS
+
+- `flask-cors` is installed — restrict origins in production, allow Vite dev server locally (`http://localhost:5173`).
+
+## Error handling
+
+```python
+# ✅ Register handlers in create_app()
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"error": "not found"}), 404
+```
+
+- Log unexpected exceptions; never expose stack traces to clients in production.
+
+## Bad habits to avoid
+
+- Putting business logic directly in route handlers without models/services.
+- Using global mutable lists/dicts as a "database" — use SQLAlchemy.
+- `@app.route` for everything in one file — use blueprints.
+- Returning HTML from API routes.
+- Running with `debug=True` in production.
