@@ -1,0 +1,21 @@
+# Render Blueprint — deploy on merge to main after connecting the repo in Render dashboard.
+# Free tier: 512 MB RAM, spins down after 15 min idle, ephemeral disk (SQLite resets on redeploy/wake).
+services:
+  - type: web
+    name: todo-app-ezgiver
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: frankfurt
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: APP_CONFIG
+        value: config.ProductionConfig
+      - key: DATABASE_URL
+        value: sqlite:///todo.db
+      - key: STATIC_ROOT
+        value: /app/static
+      # Same-origin in prod, so this stays empty (CORS not needed).
+      - key: CORS_ORIGINS
+        value: ""

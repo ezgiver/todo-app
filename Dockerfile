@@ -34,8 +34,10 @@ COPY --from=frontend /build/dist ./static
 
 ENV PATH="/app/.venv/bin:$PATH" \
     STATIC_ROOT=/app/static \
-    APP_CONFIG=config.ProductionConfig
+    APP_CONFIG=config.ProductionConfig \
+    PORT=8080
 
 EXPOSE 8080
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--access-logfile", "-", "wsgi:app"]
+# Shell form so ${PORT} expands (Render sets PORT dynamically).
+CMD gunicorn --bind 0.0.0.0:${PORT} --workers 2 --access-logfile - wsgi:app
