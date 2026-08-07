@@ -20,7 +20,7 @@ docker compose up --build
 cd backend
 uv sync
 uv run flask --app wsgi run --debug --port 5001
-uv run pytest      # 16 tests
+uv run pytest      # 30 tests
 ```
 
 **Frontend** (port `5173`):
@@ -58,7 +58,11 @@ Auto-deploys on merge to `main`. Free tier is fully free — no credit card, no 
 1. Sign up at https://render.com (GitHub sign-in works, no card required).
 2. Dashboard → **New +** → **Blueprint** → select `ezgiver/todo-app` → **Apply**.
 3. Render reads [render.yaml](render.yaml) and [Dockerfile](Dockerfile), builds, and deploys.
-4. Live URL will be `https://todo-app-ezgiver.onrender.com` (Render will suggest a suffix if the name is taken).
+4. **Set `SECRET_KEY` as a Render secret** (dashboard → service → Environment) — the app refuses to start without it. Generate one with:
+   ```bash
+   python -c "import secrets; print(secrets.token_hex(32))"
+   ```
+5. Live URL will be `https://todo-app-ezgiver.onrender.com` (Render will suggest a suffix if the name is taken).
 
 **Every future push to `main` auto-deploys.** Watch progress at https://dashboard.render.com.
 

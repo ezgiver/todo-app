@@ -2,6 +2,7 @@ const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:5001/api'
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     ...options,
   })
@@ -10,10 +11,14 @@ async function request(path, options = {}) {
 
   const body = await res.json().catch(() => ({}))
   if (!res.ok) {
-    throw new Error(body.error ?? `Request failed (${res.status})`)
+    const err = new Error(body.error ?? `Request failed (${res.status})`)
+    err.status = res.status
+    throw err
   }
   return body
 }
+
+export { request }
 
 export function fetchTodos() {
   return request('/todos/')

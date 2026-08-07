@@ -4,6 +4,7 @@ from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 
 from .extensions import db
+from .routes.auth import auth_bp
 from .routes.health import health_bp
 from .routes.todos import todos_bp
 
@@ -22,6 +23,8 @@ def create_app(config_object: str = "config.DevelopmentConfig") -> Flask:
     app = Flask(__name__, **kwargs)
     app.config.from_object(config_object)
 
+    _validate_secret_key(app)
+
     _ensure_instance_folder(app)
     db.init_app(app)
     CORS(
@@ -29,9 +32,10 @@ def create_app(config_object: str = "config.DevelopmentConfig") -> Flask:
         resources={r"/api/*": {"origins": app.config.get("CORS_ORIGINS", [])}},
         methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type"],
-        supports_credentials=False,
+        supports_credentials=True,
     )
 
+    app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(health_bp, url_prefix="/api/health")
     app.register_blueprint(todos_bp, url_prefix="/api/todos")
 
@@ -45,6 +49,19 @@ def create_app(config_object: str = "config.DevelopmentConfig") -> Flask:
         db.create_all()
 
     return app
+
+
+def _validate_secret_key(app: Flask) -> None:
+    key = app.config.get("SECRET_KEY")
+    if not key:
+        raise RuntimeError(
+            "SECRET_KEY is not set. Refusing to start."
+            " Set the SECRET_KEY environment variable."
+        )
+    if not app.debug and not app.testing and key == "dev-only-not-for-prod":
+        raise RuntimeError(
+            "Refusing to start with the dev placeholder SECRET_KEY in production."
+        )
 
 
 def _ensure_instance_folder(app: Flask) -> None:

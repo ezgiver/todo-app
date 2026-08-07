@@ -19,3 +19,7 @@ services:
       # Same-origin in prod, so this stays empty (CORS not needed).
       - key: CORS_ORIGINS
         value: ""
+      # REQUIRED. Set this as a secret in the Render dashboard (not committed here).
+      # Generate once: python -c "import secrets; print(secrets.token_hex(32))"
+      - key: SECRET_KEY
+        sync: false
