@@ -1,3 +1,11 @@
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _auto_login(register_and_login):
+    register_and_login()
+
+
 def test_list_empty(client):
     res = client.get("/api/todos/")
     assert res.status_code == 200

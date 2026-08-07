@@ -1,0 +1,241 @@
+---
+description: Authentication (authN) and authorization (authZ) rules for the todo app
+globs: backend/**/*.py,frontend/**/*.{js,jsx}
+alwaysApply: false
+---
+
+# Authentication & Authorization Rules
+
+Sourced from OWASP ASVS 4.0, OWASP Authentication / Session Management / Password
+Storage Cheat Sheets, and NIST 800-63B.
+
+## Vocabulary
+
+- **Authentication (authN)** — proving *who* the user is (login).
+- **Authorization (authZ)** — deciding *what* they're allowed to do (route + resource access).
+- Both are required for every mutating endpoint.
+
+## Stack decisions
+
+- **Session cookies** signed with a server `SECRET_KEY` (Flask's built-in `session`).
+- **Passwords** hashed with `werkzeug.security.generate_password_hash` (scrypt by default).
+
+## Passwords
+
+### Requirements
+
+```python
+MIN_PASSWORD_LENGTH = 12       # NIST 800-63B recommends min 8; we require 12.
+MAX_PASSWORD_LENGTH = 128      # prevents DoS via giant scrypt inputs.
+```
+
+- **Minimum length**, no composition rules (no forced upper/digit/symbol — worsens UX without meaningfully improving strength; NIST agrees).
+- **Reject** passwords equal to email, or on a small blocklist of top-100 breached passwords (optional but easy).
+- **Never** log or return the password or its hash.
+
+### Hashing
+
+```python
+# ✅ GOOD
+from werkzeug.security import generate_password_hash, check_password_hash
+
+user.password_hash = generate_password_hash(password)          # scrypt, per-user salt
+ok = check_password_hash(user.password_hash, submitted)        # constant-time compare
+```
+
+```python
+# ❌ BAD
+user.password_hash = hashlib.sha256(password.encode()).hexdigest()  # no salt, fast, crackable
+user.password = password                                            # plaintext, never
+if user.password_hash == submitted_hash: ...                        # timing attack
+```
+
+## Registration
+
+```python
+# ✅ Validate → check duplicate → hash → commit
+data = request.get_json(silent=True) or {}
+email = (data.get("email") or "").strip().lower()
+password = data.get("password") or ""
+
+if not email or "@" not in email:
+    return jsonify({"error": "valid email required"}), 400
+if not (MIN_PASSWORD_LENGTH <= len(password) <= MAX_PASSWORD_LENGTH):
+    return jsonify({"error": f"password must be {MIN_PASSWORD_LENGTH}-{MAX_PASSWORD_LENGTH} chars"}), 400
+if User.query.filter_by(email=email).first():
+    # Same generic message as a valid signup would give — don't leak account existence.
+    return jsonify({"error": "unable to register with those credentials"}), 400
+```
+
+- **Do not** confirm whether an email is already registered in the response — that's account enumeration.
+- Store email **lower-cased** to prevent duplicates like `A@x.com` vs `a@x.com`.
+
+## Login
+
+```python
+# ✅ Constant-ish time; identical error for missing user vs bad password.
+user = User.query.filter_by(email=email).first()
+if user is None or not check_password_hash(user.password_hash, password):
+    return jsonify({"error": "invalid credentials"}), 401
+
+session.clear()                # prevent session fixation
+session["user_id"] = user.id
+session.permanent = True        # respect PERMANENT_SESSION_LIFETIME
+```
+
+- **Same error message** for "user not found" and "wrong password" — otherwise you leak which emails have accounts.
+- Regenerate the session (via `session.clear()` before setting new keys) on every login.
+- Prefer a **rate limit** on `/auth/login` (5 attempts / minute / IP) — leave a `TODO` if not implementing now.
+
+## Sessions and cookies
+
+Configuration (`app.config`):
+
+```python
+SESSION_COOKIE_HTTPONLY = True       # blocks JavaScript access
+SESSION_COOKIE_SECURE = True         # HTTPS only in prod (False in local dev)
+SESSION_COOKIE_SAMESITE = "Lax"      # blocks basic CSRF
+PERMANENT_SESSION_LIFETIME = timedelta(days=7)  # absolute timeout
+```
+
+- `SECRET_KEY` is **required** in production. App must refuse to start with a placeholder.
+- Rotate `SECRET_KEY` to force-log-out everyone (mass invalidation for compromise response).
+- Never put secrets *inside* the session dict — assume the cookie value is visible (it's only signed, not encrypted).
+
+### Flask session specifics (per Flask docs)
+
+Flask's default `session` is a **client-side signed cookie** (`itsdangerous`), not a server-side store. Implications:
+
+- **State lives in the cookie**, not the server. There is no `sessions` table to delete from.
+- **Signed, not encrypted.** `base64` decode reveals contents; only mutation is prevented.
+- **~4 KB cookie size limit.** Fine for `{"user_id": 1, "_permanent": true}`. Never stuff blobs.
+- **`session.permanent = True`** switches from browser-lifetime cookie to `PERMANENT_SESSION_LIFETIME`-lifetime cookie. Timestamp is signed, so expiry is enforced server-side even though state is client-side.
+- **Immediate mass logout** is only possible by rotating `SECRET_KEY`. No per-user server-side revoke.
+- **Escape hatch:** switch to `Flask-Session` (server-side store: Redis, DB, filesystem) when you need per-user forced logout, big session data, or key rotation without invalidating everyone.
+
+Do not modify the session dict *after* the response has started (e.g. from background threads) — Flask only serializes it once per request during response generation.
+
+## Logout
+
+```python
+# ✅
+session.clear()
+return "", 204
+```
+
+## Authorization (route + resource level)
+
+### Route-level (authN check)
+
+```python
+from functools import wraps
+
+def login_required(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify({"error": "authentication required"}), 401
+        return view(*args, **kwargs)
+    return wrapper
+
+@todos_bp.get("/")
+@login_required
+def list_todos(): ...
+```
+
+### Resource-level (ownership check)
+
+**Every** read/update/delete of a resource that belongs to a user MUST filter by `current_user.id`.
+
+```python
+# ✅ GOOD — user can only touch their own todo
+todo = Todo.query.filter_by(id=todo_id, user_id=session["user_id"]).first()
+if todo is None:
+    return jsonify({"error": "not found"}), 404   # not "forbidden" — don't leak existence
+```
+
+```python
+# ❌ BAD — Insecure Direct Object Reference (IDOR)
+todo = db.session.get(Todo, todo_id)   # any logged-in user can access any todo
+```
+
+- Return **404** (not 403) for another user's resource — matches "not found" and hides existence.
+- The `user_id` filter goes into the **query**, not into a post-fetch Python `if`.
+
+## CSRF
+
+- **Same-origin production (Render):** `SameSite=Lax` cookies + POST/PATCH/DELETE via `fetch` from same origin = safe from classic CSRF.
+- **Cross-origin dev (Vite `:5173` → Flask `:5001`):** the browser still sends the cookie because `SameSite=Lax` allows same-*site* cross-*port*, but this is a dev-only quirk.
+- **If you ever add HTML forms served by Flask** or non-`SameSite=Lax` cookies, add explicit CSRF tokens (Flask-WTF).
+
+## CORS with credentials (dev only)
+
+```python
+# ✅ Dev needs supports_credentials=True so browsers send cookies cross-port.
+CORS(app, resources={r"/api/*": {"origins": [...]}}, supports_credentials=True)
+```
+
+- Never `origins="*"` when `supports_credentials=True` — browsers reject it, and it's a huge security risk anyway.
+
+## Error handling — don't leak information
+
+| Situation | Do NOT return | Return |
+|---|---|---|
+| Bad login | "user not found" / "wrong password" | `401 invalid credentials` |
+| Duplicate signup | "email already exists" | `400 unable to register with those credentials` |
+| Access someone else's resource | `403 forbidden` | `404 not found` |
+| Server crash | full stack trace | `500 internal server error` |
+
+## Rate limiting (TODO for future PR)
+
+Not implementing now, but the following endpoints **need** it before this is production-ready:
+
+- `POST /api/auth/login` — 5 / min / IP (brute force protection).
+- `POST /api/auth/register` — 3 / min / IP (bot spam).
+
+Recommended library: `flask-limiter` with a Redis backend.
+
+## Testing
+
+- **AuthN happy path** — register → login → me → logout.
+- **AuthN failure modes** — bad password, unknown email, missing fields, invalid email, weak password.
+- **AuthZ isolation** — user A logs in, cannot see or mutate user B's todos (`GET /api/todos/<b_id>` returns 404, `PATCH` returns 404, etc.).
+- **Session hygiene** — logout clears the cookie; unauth'd calls to protected routes return 401.
+- **Password never leaks** — no field named `password` or `password_hash` in any response body.
+
+## Frontend rules
+
+- Send cookies with every API call: `fetch(url, { credentials: "include" })`.
+- On any `401` from an API call, clear client-side auth state and route the user to the login screen. Do not retry or loop.
+- Never store the password (or anything derived) in `localStorage`, `sessionStorage`, or Redux/state after login.
+- Login/register form fields:
+  - `<input type="email" autoComplete="email" required>` — enables browser password manager.
+  - `<input type="password" autoComplete="current-password">` (or `new-password` on register).
+- Log the user out (client-side) on tab close if you use `session.permanent = False`. We use `True` (persistent), so the cookie survives until server expiry.
+
+## Bad habits to avoid
+
+| ❌ Bad | ✅ Do instead |
+|---|---|
+| JWT in `localStorage` | Session cookie (HttpOnly + Secure + SameSite=Lax) |
+| Different errors for "unknown user" vs "wrong password" | Same generic 401 |
+| `db.session.get(Todo, id)` on user-owned resources | `Todo.query.filter_by(id=id, user_id=current_user_id)` |
+| Password composition rules (must have symbol, etc.) | Length minimum (12+), reject top breached |
+| Returning `password_hash` in `to_dict()` | Exclude it — hard-code the field allowlist |
+| Trusting `session["user_id"]` presence = admin | Explicit role/permission check per operation |
+| Regex-heavy email validation | Basic "has @, has ., length < 254" sanity check |
+| Rolling your own hash (SHA-256 etc.) | Use `werkzeug.security` (scrypt) |
+| `SECRET_KEY = "dev"` deployed to prod | Fail-fast startup check for placeholder secrets |
+| Redirect after login by trusting `?next=` param | Validate the URL is internal (starts with `/`) before redirecting |
+
+## Checklist before merging any auth-related PR
+
+- [ ] `SECRET_KEY` loaded from env, refuses to start in prod without it.
+- [ ] Password hashing uses `werkzeug.security`.
+- [ ] `SESSION_COOKIE_HTTPONLY=True`, `_SECURE=True` in prod, `_SAMESITE="Lax"`.
+- [ ] All protected routes decorated with `@login_required`.
+- [ ] All user-owned resource queries filter by `user_id`.
+- [ ] Login + register return **identical** error text for invalid attempts.
+- [ ] No `password` / `password_hash` field in any response body.
+- [ ] Frontend uses `credentials: "include"` on API calls.
+- [ ] Tests cover authZ isolation between two users.

@@ -4,6 +4,8 @@ services:
     environment:
       # SQLite lives in the named volume so todos survive restarts.
       DATABASE_URL: sqlite:////app/instance/todo.db
+      # Local dev secret — the app refuses to boot without one.
+      SECRET_KEY: dev-local-compose-secret-not-for-prod
     volumes:
       - backend-data:/app/instance
     expose:
