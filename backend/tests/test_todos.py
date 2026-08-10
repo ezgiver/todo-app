@@ -1,6 +1,11 @@
 import pytest
 
 
+def _assert_iso_datetime(value: str | None):
+    assert value is not None
+    assert "T" in value
+
+
 @pytest.fixture(autouse=True)
 def _auto_login(register_and_login):
     register_and_login()
@@ -29,6 +34,19 @@ def test_create_success(client):
     assert body["title"] == "buy milk"
     assert body["completed"] is False
     assert isinstance(body["id"], int)
+    _assert_iso_datetime(body["created_at"])
+    _assert_iso_datetime(body["updated_at"])
+    assert body["due_at"] is None
+
+
+def test_create_with_due_at(client):
+    res = client.post(
+        "/api/todos/",
+        json={"title": "pay bill", "due_at": "2026-08-10T18:30:00"},
+    )
+    assert res.status_code == 201
+    body = res.get_json()
+    assert body["due_at"] == "2026-08-10T18:30:00"
 
 
 def test_create_missing_title(client):
@@ -44,6 +62,11 @@ def test_create_empty_title(client):
 
 def test_create_no_json_body(client):
     res = client.post("/api/todos/")
+    assert res.status_code == 400
+
+
+def test_create_rejects_invalid_due_at(client):
+    res = client.post("/api/todos/", json={"title": "bad", "due_at": "soon"})
     assert res.status_code == 400
 
 
@@ -82,6 +105,22 @@ def test_patch_partial_keeps_other_fields(client, make_todo):
     assert body["completed"] is True
 
 
+def test_patch_due_at(client, make_todo):
+    todo = make_todo()
+    res = client.patch(
+        f"/api/todos/{todo['id']}", json={"due_at": "2026-08-11T09:15:00"}
+    )
+    assert res.status_code == 200
+    assert res.get_json()["due_at"] == "2026-08-11T09:15:00"
+
+
+def test_patch_clear_due_at(client, make_todo):
+    todo = make_todo()
+    res = client.patch(f"/api/todos/{todo['id']}", json={"due_at": None})
+    assert res.status_code == 200
+    assert res.get_json()["due_at"] is None
+
+
 def test_patch_rejects_empty_title(client, make_todo):
     todo = make_todo()
     res = client.patch(f"/api/todos/{todo['id']}", json={"title": "  "})
@@ -91,6 +130,12 @@ def test_patch_rejects_empty_title(client, make_todo):
 def test_patch_rejects_non_bool_completed(client, make_todo):
     todo = make_todo()
     res = client.patch(f"/api/todos/{todo['id']}", json={"completed": "yes"})
+    assert res.status_code == 400
+
+
+def test_patch_rejects_invalid_due_at(client, make_todo):
+    todo = make_todo()
+    res = client.patch(f"/api/todos/{todo['id']}", json={"due_at": "yesterday"})
     assert res.status_code == 400
 
 

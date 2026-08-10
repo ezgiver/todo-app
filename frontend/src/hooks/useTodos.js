@@ -35,9 +35,9 @@ export function useTodos({ enabled = true, onUnauthorized } = {}) {
   }, [enabled, load])
 
   const add = useCallback(
-    async (title) => {
+    async (title, dueAt) => {
       try {
-        const created = await api.createTodo(title)
+        const created = await api.createTodo(title, dueAt)
         setTodos((prev) => [created, ...prev])
       } catch (err) {
         if (err.status === 401 && onUnauthorized) {

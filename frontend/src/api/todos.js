@@ -24,10 +24,14 @@ export function fetchTodos() {
   return request('/todos/')
 }
 
-export function createTodo(title) {
+export function createTodo(title, dueAt) {
+  const payload = { title }
+  if (dueAt !== undefined) {
+    payload.due_at = dueAt
+  }
   return request('/todos/', {
     method: 'POST',
-    body: JSON.stringify({ title }),
+    body: JSON.stringify(payload),
   })
 }
 

@@ -86,7 +86,8 @@ export default function App() {
         </p>
         <p className="app-help">
           Click Edit to change a task. Click Save to keep it. Click Cancel or
-          press Esc to discard the change. Use Sort to change task order.
+          press Esc to discard the change. Use Sort to change task order, and
+          set a due date to see overdue tasks.
         </p>
       </header>
 

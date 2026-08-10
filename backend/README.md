@@ -34,9 +34,9 @@ Base URL: `/api/todos`
 | Method | Path                | Body                                 | Success | Errors     | Status |
 |--------|---------------------|--------------------------------------|---------|------------|--------|
 | GET    | `/api/todos`        | —                                    | 200     | 500        | done   |
-| POST   | `/api/todos`        | `{ "title": "string" }`              | 201     | 400        | TODO   |
+| POST   | `/api/todos`        | `{ "title": "string", "due_at"?: str }` | 201  | 400        | TODO   |
 | GET    | `/api/todos/<id>`   | —                                    | 200     | 404        | TODO   |
-| PATCH  | `/api/todos/<id>`   | `{ "title"?: str, "completed"?: bool }` | 200  | 400, 404   | TODO   |
+| PATCH  | `/api/todos/<id>`   | `{ "title"?: str, "completed"?: bool, "due_at"?: str|null }` | 200  | 400, 404   | TODO   |
 | DELETE | `/api/todos/<id>`   | —                                    | 204     | 404        | TODO   |
 
 ### Todo shape
@@ -46,6 +46,7 @@ Base URL: `/api/todos`
   "id": 1,
   "title": "Buy milk",
   "completed": false,
+  "due_at": null,
   "created_at": "2026-08-06T10:00:00",
   "updated_at": "2026-08-06T10:00:00"
 }

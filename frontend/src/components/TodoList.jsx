@@ -2,7 +2,14 @@ import { TodoItem } from './TodoItem'
 
 /**
  * @param {{
- *   todos: Array<{ id: number, title: string, completed: boolean }>,
+ *   todos: Array<{
+ *     id: number,
+ *     title: string,
+ *     completed: boolean,
+ *     due_at: string | null,
+ *     created_at: string | null,
+ *     updated_at: string | null,
+ *   }>,
  *   loading: boolean,
  *   error: string | null,
  *   onToggle: (id: number) => void,

@@ -13,6 +13,7 @@ class Todo(db.Model):
     )
     title = db.Column(db.String(255), nullable=False)
     completed = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    due_at = db.Column(db.DateTime, nullable=True, index=True)
     created_at = db.Column(
         db.DateTime, server_default=db.func.now(), nullable=False, index=True
     )
@@ -28,6 +29,7 @@ class Todo(db.Model):
             "id": self.id,
             "title": self.title,
             "completed": self.completed,
+            "due_at": self.due_at.isoformat() if self.due_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
