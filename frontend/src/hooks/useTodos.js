@@ -40,11 +40,28 @@ export function useTodos({ enabled = true, onUnauthorized } = {}) {
         const created = await api.createTodo(title)
         setTodos((prev) => [created, ...prev])
       } catch (err) {
-        handle(err)
+        if (err.status === 401 && onUnauthorized) {
+          onUnauthorized()
+        }
         throw err
       }
     },
-    [handle],
+    [onUnauthorized],
+  )
+
+  const update = useCallback(
+    async (id, patch) => {
+      try {
+        const updated = await api.updateTodo(id, patch)
+        setTodos((prev) => prev.map((t) => (t.id === id ? updated : t)))
+      } catch (err) {
+        if (err.status === 401 && onUnauthorized) {
+          onUnauthorized()
+        }
+        throw err
+      }
+    },
+    [onUnauthorized],
   )
 
   const toggle = useCallback(
@@ -75,5 +92,5 @@ export function useTodos({ enabled = true, onUnauthorized } = {}) {
     [handle],
   )
 
-  return { todos, loading, error, add, toggle, remove, reload: load }
+  return { todos, loading, error, add, update, toggle, remove, reload: load }
 }
