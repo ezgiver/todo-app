@@ -2,6 +2,7 @@ import os
 
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
+from sqlalchemy import text
 
 from .extensions import db
 from .routes.auth import auth_bp
@@ -47,6 +48,7 @@ def create_app(config_object: str = "config.DevelopmentConfig") -> Flask:
     with app.app_context():
         # Auto-create tables in dev; swap for Flask-Migrate before prod.
         db.create_all()
+        _ensure_todo_due_at_column()
 
     return app
 
@@ -69,6 +71,19 @@ def _ensure_instance_folder(app: Flask) -> None:
         os.makedirs(app.instance_path, exist_ok=True)
     except OSError:
         pass
+
+
+def _ensure_todo_due_at_column() -> None:
+    if db.engine.dialect.name != "sqlite":
+        return
+
+    columns = db.session.execute(text("PRAGMA table_info(todos)")).mappings().all()
+    column_names = {column["name"] for column in columns}
+    if "due_at" in column_names:
+        return
+
+    db.session.execute(text("ALTER TABLE todos ADD COLUMN due_at DATETIME"))
+    db.session.commit()
 
 
 def _register_spa(app: Flask) -> None:

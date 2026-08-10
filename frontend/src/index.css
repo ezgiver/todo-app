@@ -251,6 +251,39 @@ input {
   align-items: flex-start;
 }
 
+.todo-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1 1 100%;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.todo-form-label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.todo-form-label small {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.todo-form-field input {
+  min-width: 0;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: border-color 0.15s;
+}
+
+.todo-form-field input:focus {
+  border-color: var(--accent);
+}
+
 .todo-form input[type='text'] {
   flex: 1 1 auto;
   min-width: 0;
@@ -381,6 +414,10 @@ input {
   border-color: var(--success-border);
 }
 
+.todo-item.overdue {
+  border-color: rgba(220, 38, 38, 0.55);
+}
+
 .todo-label {
   display: flex;
   align-items: center;
@@ -399,6 +436,26 @@ input {
 
 .todo-title {
   word-break: break-word;
+}
+
+.todo-meta {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.todo-meta span {
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.06);
+}
+
+.todo-meta-due.overdue {
+  color: var(--danger);
+  background: rgba(220, 38, 38, 0.08);
 }
 
 .todo-item.completed .todo-title {
@@ -433,6 +490,14 @@ input {
   min-width: 0;
 }
 
+.todo-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
 .todo-edit-input {
   padding: 0.65rem 0.85rem;
   border: 1px solid var(--border);
@@ -455,6 +520,7 @@ input {
 
 .todo-edit,
 .todo-cancel,
+.todo-clear,
 .todo-save {
   padding: 0.45rem 0.75rem;
   border-radius: 8px;
@@ -464,14 +530,16 @@ input {
 }
 
 .todo-edit,
-.todo-cancel {
+.todo-cancel,
+.todo-clear {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-muted);
 }
 
 .todo-edit:hover,
-.todo-cancel:hover {
+.todo-cancel:hover,
+.todo-clear:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -489,6 +557,7 @@ input {
 
 .todo-edit:disabled,
 .todo-cancel:disabled,
+.todo-clear:disabled,
 .todo-save:disabled,
 .todo-delete:disabled {
   opacity: 0.55;
@@ -532,5 +601,9 @@ input {
   .sort-control select {
     width: 100%;
     min-width: 0;
+  }
+
+  .todo-form-field {
+    flex-basis: 100%;
   }
 }
