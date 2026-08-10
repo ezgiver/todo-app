@@ -7,10 +7,11 @@ import { TodoItem } from './TodoItem'
  *   error: string | null,
  *   onToggle: (id: number) => void,
  *   onRemove: (id: number) => void,
+ *   onUpdate: (id: number, patch: { title?: string, completed?: boolean }) => Promise<void>,
  * }} props
  */
-export function TodoList({ todos, loading, error, onToggle, onRemove }) {
-  if (loading) return <p className="state">Loading…</p>
+export function TodoList({ todos, loading, error, onToggle, onRemove, onUpdate }) {
+  if (loading) return <p className="state" role="status" aria-live="polite">Loading…</p>
   if (error) {
     return (
       <p role="alert" className="state state-error">
@@ -19,7 +20,11 @@ export function TodoList({ todos, loading, error, onToggle, onRemove }) {
     )
   }
   if (todos.length === 0) {
-    return <p className="state">No todos yet — add one above.</p>
+    return (
+      <p className="state" role="status" aria-live="polite">
+        No todos yet. Add your first task above.
+      </p>
+    )
   }
 
   return (
@@ -30,6 +35,7 @@ export function TodoList({ todos, loading, error, onToggle, onRemove }) {
           todo={todo}
           onToggle={onToggle}
           onRemove={onRemove}
+          onUpdate={onUpdate}
         />
       ))}
     </ul>

@@ -37,10 +37,14 @@ export function TodoForm({ onAdd }) {
         onChange={(e) => setTitle(e.target.value)}
         disabled={submitting}
         autoFocus
+        aria-describedby="new-todo-hint"
       />
       <button type="submit" disabled={submitting || !title.trim()}>
         {submitting ? 'Adding…' : 'Add'}
       </button>
+      <p id="new-todo-hint" className="form-hint">
+        Press Enter to add a task quickly.
+      </p>
       {error && (
         <p role="alert" className="form-error">
           {error}
