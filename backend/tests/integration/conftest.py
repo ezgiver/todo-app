@@ -17,11 +17,16 @@ def _server_is_reachable() -> bool:
         return False
 
 
-# Skip the entire integration suite if no server is reachable.
-pytestmark = pytest.mark.skipif(
-    not _server_is_reachable(),
-    reason=f"Integration server not reachable at {BASE_URL}",
-)
+# Mark all tests in this directory as integration tests.
+# They are excluded from the default `pytest` run via pyproject.toml addopts.
+# When run explicitly (pytest tests/integration/), skip if no server is up.
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not _server_is_reachable(),
+        reason=f"Integration server not reachable at {BASE_URL}",
+    ),
+]
 
 
 @pytest.fixture(scope="session")
