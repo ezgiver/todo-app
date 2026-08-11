@@ -42,6 +42,66 @@ jobs:
       - name: Run tests
         run: uv run pytest
 
+  backend-integration:
+    name: Backend (integration)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: todo_user
+          POSTGRES_PASSWORD: todo_pass
+          POSTGRES_DB: todo_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U todo_user -d todo_db"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://todo_user:todo_pass@localhost:5432/todo_db
+      SECRET_KEY: ci-integration-test-secret
+      FLASK_APP: wsgi.py
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: backend/.python-version
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Start Flask server
+        run: uv run flask run --port 5000 &
+
+      - name: Wait for server to be ready
+        run: |
+          for i in $(seq 1 15); do
+            if curl -s http://127.0.0.1:5000/api/health | grep -q "ok"; then
+              echo "Server is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server failed to start"
+          exit 1
+
+      - name: Run integration tests
+        run: uv run pytest tests/integration/ -v
+
   frontend:
     name: Frontend (lint + build)
     runs-on: ubuntu-latest
