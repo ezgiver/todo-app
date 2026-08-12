@@ -1,0 +1,36 @@
+# Caddyfile — automatic HTTPS reverse proxy
+#
+# Usage:
+#   With a domain:  Replace {$DOMAIN} below or set DOMAIN env var
+#   Without domain: Use `:80` instead (no HTTPS) for IP-only access
+#
+# Caddy automatically provisions Let's Encrypt TLS certificates when a
+# domain name is used. With a bare IP, it serves plain HTTP on port 80.
+
+{$DOMAIN::80} {
+	# API requests → Flask backend (gunicorn)
+	handle /api/* {
+		reverse_proxy backend:5001
+	}
+
+	# Everything else → React SPA (nginx serves static files + SPA fallback)
+	handle {
+		reverse_proxy frontend:80
+	}
+
+	# Compression for faster page loads
+	encode gzip zstd
+
+	# Security headers
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
+	# Access logging
+	log {
+		output stdout
+		format console
+	}
+}
