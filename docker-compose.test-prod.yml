@@ -1,0 +1,75 @@
+# docker-compose.test-prod.yml
+# Simulates the production stack LOCALLY for testing.
+# Adds a local Postgres to stand in for Neon — everything else is identical to prod.
+#
+# Usage:
+#   docker compose -f docker-compose.test-prod.yml up --build
+#   open http://localhost
+#
+# Teardown:
+#   docker compose -f docker-compose.test-prod.yml down -v
+
+services:
+  # Local Postgres simulates Neon
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: todo_user
+      POSTGRES_PASSWORD: todo_pass
+      POSTGRES_DB: todo_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U todo_user -d todo_db"]
+      interval: 3s
+      timeout: 2s
+      retries: 5
+    # No volume — ephemeral for testing
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://todo_user:todo_pass@postgres:5432/todo_db
+      SECRET_KEY: test-local-secret-not-for-prod
+      # Use DevelopmentConfig so SESSION_COOKIE_SECURE=False (allows HTTP testing).
+      # Production uses ProductionConfig which enforces HTTPS-only cookies.
+      APP_CONFIG: config.DevelopmentConfig
+      CORS_ORIGINS: ""
+    expose:
+      - "5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    expose:
+      - "80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -20,5 +20,5 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 EXPOSE 5001
 
-# Werkzeug is fine for this small app; swap for gunicorn if you outgrow it.
-CMD ["flask", "run", "--host", "0.0.0.0", "--port", "5001"]
+# Use gunicorn for production; fall back to Flask dev server via `flask run` locally.
+CMD ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "2", "--access-logfile", "-", "wsgi:app"]
