@@ -1,0 +1,37 @@
+# fly.toml — Fly.io app configuration
+# Docs: https://fly.io/docs/reference/configuration/
+#
+# Deploy with:  fly deploy
+# First time:   fly launch --no-deploy  (then fly deploy)
+
+app = "todo-app-ezgiver"
+primary_region = "ams"   # Change to your nearest: https://fly.io/docs/reference/regions/
+
+[build]
+  # Uses the root Dockerfile (builds React frontend + Flask backend in one image)
+  dockerfile = "Dockerfile"
+
+[env]
+  APP_CONFIG = "config.ProductionConfig"
+  PORT = "8080"
+  CORS_ORIGINS = ""
+
+# Secrets (never put real values here — use `fly secrets set` instead):
+#   fly secrets set DATABASE_URL="postgresql://..."
+#   fly secrets set SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+
+[http_service]
+  internal_port = 8080        # Must match PORT above and gunicorn bind port
+  force_https = true          # Redirects HTTP → HTTPS automatically
+  auto_stop_machines = false  # Keep always on (free tier: 3 shared machines)
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+[[vm]]
+  size = "shared-cpu-1x"   # Free tier machine size
+  memory = "256mb"

@@ -1,281 +1,210 @@
-# Oracle Cloud VM Deployment Guide
+# Fly.io Deployment Guide
 
-This guide walks you through deploying the todo app to an **Oracle Cloud Always Free** ARM instance with automatic HTTPS via Caddy.
+Deploy the todo app to **Fly.io** — free, automatic HTTPS, no credit card needed.
 
 ---
 
-## Architecture Overview
+## Architecture
 
 ```
 Internet
     │
     ▼
-┌─────────────────────────────────────────────────┐
-│  Oracle Cloud VM (Ubuntu ARM)                   │
-│                                                 │
-│  ┌───────────┐   ┌───────────┐   ┌──────────┐  │
-│  │   Caddy   │──▶│  Frontend │   │ Backend  │  │
-│  │  :80/:443 │   │  (nginx)  │   │(gunicorn)│  │
-│  │           │──▶│  :80      │   │  :5001   │  │
-│  └───────────┘   └───────────┘   └────┬─────┘  │
-│                                        │        │
-└────────────────────────────────────────┼────────┘
-                                         │
-                                         ▼
-                              ┌──────────────────┐
-                              │  Neon PostgreSQL  │
-                              │  (external DB)    │
-                              └──────────────────┘
+┌─────────────────────────────────┐
+│  Fly.io (HTTPS automatic)       │
+│                                 │
+│  ┌──────────────────────────┐   │
+│  │  Single container        │   │
+│  │  gunicorn :8080          │   │
+│  │  ├── /api/*  → Flask     │   │
+│  │  └── /*      → React SPA │   │
+│  └──────────────────────────┘   │
+└──────────────────┬──────────────┘
+                   │
+                   ▼
+        ┌──────────────────┐
+        │  Neon PostgreSQL  │
+        │  (external DB)    │
+        └──────────────────┘
 ```
 
-**How traffic flows:**
-1. Caddy receives all HTTP/HTTPS traffic on ports 80 and 443
-2. Requests to `/api/*` are proxied to the Flask backend (gunicorn on port 5001)
-3. All other requests go to the React frontend (nginx serving static files)
-4. The backend connects to your Neon PostgreSQL database over the internet
+One container handles everything — Flask serves both the API and the built
+React frontend. Fly.io handles HTTPS automatically.
 
 ---
 
-## Step 1: Create an Oracle Cloud Always Free VM
+## Prerequisites
 
-### 1.1 Sign up for Oracle Cloud
-
-1. Go to [cloud.oracle.com](https://cloud.oracle.com) and create a free account
-2. You'll need a credit card for verification, but **you won't be charged** for Always Free resources
-3. Choose your "Home Region" — pick one close to you (this can't be changed later)
-
-### 1.2 Create the VM Instance
-
-1. In the Oracle Cloud Console, go to **Compute → Instances → Create Instance**
-2. Configure:
-
-| Setting | Value |
-|---------|-------|
-| **Name** | `todo-app-vm` |
-| **Image** | Ubuntu 22.04 (or 24.04) — Canonical |
-| **Shape** | VM.Standard.A1.Flex (ARM) |
-| **OCPUs** | 1 (free tier allows up to 4) |
-| **Memory** | 6 GB (free tier allows up to 24 GB) |
-| **Boot volume** | 50 GB (default, free) |
-
-3. **Networking:**
-   - Create a new VCN or use the default
-   - Ensure "Assign a public IPv4 address" is checked
-   - Select or create a subnet
-
-4. **SSH Keys:**
-   - Select "Generate a key pair" and **download both keys**, OR
-   - Select "Upload public key" and paste your existing `~/.ssh/id_rsa.pub` (recommended)
-
-5. Click **Create** — the instance will be ready in ~60 seconds
-
-### 1.3 Note your public IP
-
-Once the instance shows "Running," copy the **Public IP address** from the instance details page. You'll use this for SSH and (optionally) direct browser access.
-
-### 1.4 Configure Security Lists (Firewall)
-
-Oracle Cloud blocks ports 80/443 by default. You must open them:
-
-1. Go to **Networking → Virtual Cloud Networks → [your VCN]**
-2. Click on your **Subnet → Security List**
-3. Click **Add Ingress Rules** and add:
-
-| Source CIDR | Protocol | Dest Port | Description |
-|-------------|----------|-----------|-------------|
-| `0.0.0.0/0` | TCP | 80 | HTTP |
-| `0.0.0.0/0` | TCP | 443 | HTTPS |
-
-> **Why two firewalls?** Oracle Cloud has a VCN-level firewall (Security Lists) AND an OS-level firewall (iptables). You need to open ports in both. The `setup-vm.sh` script handles iptables for you.
+- A [Neon](https://console.neon.tech) PostgreSQL database (already migrated)
+- [Homebrew](https://brew.sh) installed on your Mac
 
 ---
 
-## Step 2: SSH into the VM
+## Step 1: Install the Fly CLI and sign up
 
 ```bash
-# If you downloaded Oracle's generated key:
-chmod 400 ~/Downloads/ssh-key-*.key
-ssh -i ~/Downloads/ssh-key-*.key ubuntu@<YOUR_VM_IP>
-
-# If you used your own key:
-ssh ubuntu@<YOUR_VM_IP>
+brew install flyctl
 ```
 
-**Pro tip:** Add this to `~/.ssh/config` for easy access:
-
-```
-Host todo-vm
-    HostName <YOUR_VM_IP>
-    User ubuntu
-    IdentityFile ~/.ssh/id_rsa
-```
-
-Then just: `ssh todo-vm`
-
----
-
-## Step 3: Set Up the VM
-
-Run the setup script (installs Docker, opens firewall ports):
+Sign up using your GitHub account (no credit card needed):
 
 ```bash
-# On the VM:
-git clone https://github.com/ezgiver/todo-app.git ~/todo-app
-cd ~/todo-app
-bash deploy/setup-vm.sh
+fly auth signup
 ```
 
-**Then log out and back in** (so Docker group permissions take effect):
+This opens a browser window — click "Continue with GitHub", authorize, done.
+
+If you already have an account:
 
 ```bash
-exit
-ssh todo-vm
-```
-
-Verify Docker works:
-```bash
-docker run --rm hello-world
+fly auth login
 ```
 
 ---
 
-## Step 4: Configure Environment
+## Step 2: Pick your app name and region
 
-```bash
-cd ~/todo-app
-cp deploy/.env.example deploy/.env
-nano deploy/.env
+Open `fly.toml` in the project root and update these two lines:
+
+```toml
+app = "todo-app-ezgiver"   # must be globally unique on Fly.io
+primary_region = "ams"     # pick your nearest region
 ```
 
-Fill in your real values:
+**Nearest regions:**
 
-```env
-DATABASE_URL=postgresql://user:password@ep-xxxx.us-east-2.aws.neon.tech/todo_db?sslmode=require
-SECRET_KEY=<your-generated-secret>
-DOMAIN=:80
-```
+| Your location | Code |
+|---|---|
+| Western Europe | `ams` (Amsterdam) or `fra` (Frankfurt) |
+| US East | `iad` (Virginia) |
+| US West | `sjc` (San Jose) |
+| Asia Pacific | `sin` (Singapore) |
 
-> **Generate a SECRET_KEY:**
-> ```bash
-> python3 -c "import secrets; print(secrets.token_hex(32))"
-> ```
+Full list: https://fly.io/docs/reference/regions/
+
+> **App name tip:** It becomes part of your URL: `https://your-app-name.fly.dev`
+> If the name is taken, Fly.io will tell you during the next step.
 
 ---
 
-## Step 5: Deploy!
+## Step 3: Register the app on Fly.io
+
+Run this from the **project root** (where `fly.toml` lives):
 
 ```bash
-cd ~/todo-app
-bash deploy/deploy.sh
+fly launch --no-deploy
 ```
 
-This will:
-1. Pull the latest code from git
-2. Build the Docker containers
-3. Start everything in detached mode
-4. Run a health check on the backend
+When prompted:
+- **"Would you like to copy its configuration to the new app?"** → type `y`
+- **"Would you like to set up a Postgresql database?"** → type `n` (using Neon)
+- **"Would you like to set up an Upstash Redis database?"** → type `n`
 
-**Test it:**
+This registers the app name on Fly.io without deploying anything yet.
+
+---
+
+## Step 4: Set your secrets
+
+Secrets are encrypted environment variables — never visible in logs or code:
+
 ```bash
-# From your local machine:
-curl http://<YOUR_VM_IP>/api/health
-# Should return: {"status": "ok"} or similar
+# Your Neon connection string (copy from https://console.neon.tech → Connection Details):
+fly secrets set DATABASE_URL="postgresql://user:password@ep-xxxx.us-east-2.aws.neon.tech/todo_db?sslmode=require"
 
-# Open in browser:
-open http://<YOUR_VM_IP>
+# Generate and set a Flask secret key in one command:
+fly secrets set SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+```
+
+> ⚠️ Always wrap `DATABASE_URL` in double quotes — the connection string contains
+> special characters that the shell would misread without them.
+
+Verify they were saved:
+```bash
+fly secrets list
+# NAME          DIGEST    CREATED AT
+# DATABASE_URL  xxxxxxxx  just now
+# SECRET_KEY    xxxxxxxx  just now
 ```
 
 ---
 
-## Step 6: Domain Name + HTTPS (Recommended)
+## Step 5: Deploy
 
-### Should I get a domain?
-
-| Approach | Pros | Cons |
-|----------|------|------|
-| **IP only** | Free, immediate | No HTTPS, hard to remember, changes if VM recreated |
-| **Domain** ($10-15/year) | HTTPS automatic, professional, stable | Small yearly cost |
-
-**Recommendation:** Get a cheap domain from Namecheap, Porkbun, or Cloudflare (~$10/year for a `.dev` or `.app` domain). HTTPS is important for secure cookies (which your Flask session auth uses).
-
-### Set up DNS
-
-1. Buy a domain (e.g., `todo.yourdomain.com`)
-2. In your DNS provider, add an **A record**:
-   - Name: `todo` (or `@` for root)
-   - Value: `<YOUR_VM_IP>`
-   - TTL: 300 (5 minutes for testing)
-
-3. Wait for DNS propagation (usually 1-5 minutes)
-
-### Enable HTTPS
-
-Update `deploy/.env`:
-
-```env
-DOMAIN=todo.yourdomain.com
-```
-
-Restart:
 ```bash
-cd ~/todo-app
-docker compose -f docker-compose.prod.yml --env-file deploy/.env down
-bash deploy/deploy.sh
+fly deploy
 ```
 
-Caddy will **automatically** obtain a Let's Encrypt certificate. No extra configuration needed!
+What happens:
+1. Fly.io builds the Docker image on their servers (React frontend + Flask backend)
+2. Pushes the image to their registry
+3. Starts the container and runs health checks against `/api/health`
+4. Prints your live URL when done
+
+First deploy takes ~3 minutes. Subsequent deploys are faster (layers are cached).
+
+**Expected output at the end:**
+```
+Visit your newly deployed app at https://todo-app-yourname.fly.dev/
+```
 
 ---
 
-## Step 7: Verify Persistence
-
-Test that data survives redeployments:
+## Step 6: Verify
 
 ```bash
-# 1. Create a todo
-curl -X POST http://<YOUR_DOMAIN>/api/todos \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Test persistence"}'
+# Check the app is alive:
+fly open
+# Opens https://todo-app-yourname.fly.dev in your browser
+
+# Check the API directly:
+curl https://todo-app-yourname.fly.dev/api/health
+# {"status": "ok"}
+
+# View live logs:
+fly logs
+```
+
+---
+
+## Step 7: Verify data persistence
+
+Test that todos survive a redeploy (data lives in Neon, not the container):
+
+```bash
+# 1. Open the app, create a todo
+fly open
 
 # 2. Redeploy
-bash deploy/deploy.sh
+fly deploy
 
-# 3. Check the todo still exists
-curl http://<YOUR_DOMAIN>/api/todos
-# Should still show "Test persistence"
+# 3. Open again — your todo should still be there
+fly open
 ```
-
-Data persists because the database is on **Neon** (external), not inside the containers.
 
 ---
 
-## Common Operations
+## Redeploying after code changes
 
-### View logs
+Every time you push new code and want it live:
+
 ```bash
-cd ~/todo-app
-docker compose -f docker-compose.prod.yml --env-file deploy/.env logs -f
-docker compose -f docker-compose.prod.yml --env-file deploy/.env logs backend  # just backend
+fly deploy
 ```
 
-### Restart a single service
-```bash
-docker compose -f docker-compose.prod.yml --env-file deploy/.env restart backend
-```
+That's it. Fly.io builds, deploys, and switches traffic with zero downtime.
 
-### Full redeploy from local machine
-```bash
-ssh todo-vm 'cd ~/todo-app && bash deploy/deploy.sh'
-```
+---
 
-### Stop everything
-```bash
-docker compose -f docker-compose.prod.yml --env-file deploy/.env down
-```
+## Common operations
 
-### Check resource usage
 ```bash
-docker stats
+fly logs              # Live log stream
+fly status            # Container health and region info
+fly ssh console       # SSH into the running container
+fly secrets list      # List secret names (values are never shown)
+fly secrets set KEY="value"   # Add or update a secret
+fly open              # Open the app in your browser
 ```
 
 ---
@@ -284,83 +213,9 @@ docker stats
 
 | Problem | Solution |
 |---------|----------|
-| Can't reach VM on port 80 | Check Oracle Cloud Security List AND iptables (run `setup-vm.sh` again) |
-| Caddy won't get HTTPS cert | Ensure DNS A record points to your VM IP; ensure port 80 is reachable (Let's Encrypt uses HTTP challenge) |
-| Backend unhealthy | Check logs: `docker compose -f docker-compose.prod.yml logs backend` |
-| Database connection refused | Verify `DATABASE_URL` in `deploy/.env`; ensure Neon project isn't suspended |
-| "Permission denied" on Docker | Log out and back in after running `setup-vm.sh` (docker group) |
-| ARM image build fails | Both Python and Node base images support ARM natively — this shouldn't happen. If a dependency doesn't support ARM, pin an x86 version |
-
----
-
-## Cost Summary
-
-| Resource | Monthly Cost |
-|----------|-------------|
-| Oracle Cloud VM (A1.Flex, 1 OCPU, 6GB RAM) | **Free forever** |
-| Neon PostgreSQL (free tier) | **Free** (0.5 GB storage) |
-| Domain name | ~$1/month ($10-15/year) |
-| **Total** | **~$0-1/month** |
-
----
-
-## Local Testing (Before Deploying to Oracle Cloud)
-
-You can validate the entire production stack on your local machine before touching the VM.
-
-### Quick test (automated)
-
-```bash
-bash deploy/test-local.sh
-```
-
-This script will:
-1. Build all containers (backend with gunicorn, frontend with nginx, Caddy, local Postgres)
-2. Wait for health checks to pass
-3. Run 7 smoke tests (API health, frontend serving, todo CRUD, security headers)
-4. Tear everything down automatically
-
-### Manual test
-
-```bash
-# Start the production-like stack
-docker compose -f docker-compose.test-prod.yml up --build
-
-# In another terminal, verify:
-curl http://localhost/api/health        # Backend OK?
-curl http://localhost                    # Frontend loads?
-curl -X POST http://localhost/api/todos \
-  -H "Content-Type: application/json" \
-  -d '{"title": "local test"}'          # Create works?
-
-# Teardown
-docker compose -f docker-compose.test-prod.yml down -v
-```
-
-### What this tests
-
-| Layer | What's validated |
-|-------|-----------------|
-| Backend Dockerfile | gunicorn starts, serves `/api/health` |
-| Frontend Dockerfile | Vite builds, nginx serves SPA |
-| Caddy reverse proxy | Routes `/api/*` to backend, `/` to frontend |
-| Docker networking | Containers can talk to each other by service name |
-| Health checks | Docker waits for backend before starting frontend |
-
-> **Note:** The only thing NOT tested locally is the Neon connection and HTTPS certificates (those require a real domain + public IP). But if the local test passes, the prod deploy will work — just swap the DATABASE_URL.
-
----
-
-## File Structure (new files)
-
-```
-deploy/
-├── .env.example     # Template for environment variables
-├── Caddyfile        # Caddy reverse proxy configuration
-├── deploy.sh        # Deployment script (run on VM)
-├── setup-vm.sh      # One-time VM setup script
-└── test-local.sh    # Local smoke test (runs full stack, validates, tears down)
-docker-compose.prod.yml        # Production compose (no local DB)
-docker-compose.test-prod.yml   # Local testing compose (includes local Postgres)
-.gitignore                     # Prevents .env from being committed
-```
+| `app name already taken` | Change `app` in `fly.toml` to a unique name |
+| `SECRET_KEY is not set. Refusing to start` | Run `fly secrets set SECRET_KEY="..."` |
+| `DATABASE_URL not set` / DB connection error | Run `fly secrets set DATABASE_URL="..."` — check Neon is not suspended |
+| Deploy fails at health check | Run `fly logs` immediately after to see the crash reason |
+| App loads but `/api/*` returns 500 | Run `fly logs \| grep ERROR` |
+| `fly launch` says app already exists | You already registered it — just run `fly deploy` |
