@@ -68,3 +68,21 @@ Copy `.env.example` to `.env` and adjust. Supported vars:
 ## What's left to implement
 
 Open [app/routes/todos.py](app/routes/todos.py) — each stubbed handler currently returns `501 not implemented` and has a numbered `TODO` list describing exactly what to write.
+
+## Local next-action assistant
+
+Run Ollama with the `llama2` model installed. Flask calls its `/api/chat` endpoint.
+`OLLAMA_BASE_URL` defaults to `http://localhost:11434`; `OLLAMA_MODEL` defaults to
+`llama2`. Restart Flask after changing these variables. For Docker on macOS, use
+`http://host.docker.internal:11434` as the backend's Ollama URL.
+
+`POST /api/assistant/next-step` requires login and accepts
+`{"task": "start working on my app"}` (1–1000 characters). Returns
+`{"step": "One suggested action..."}`. Invalid input returns 400; unavailable,
+slow, or malformed model responses return 503. Nothing is saved automatically.
+The user may explicitly add the suggestion using the existing todo endpoint.
+
+This is a local prototype. A deployed backend cannot reach your laptop through
+localhost. Public rollout requires a reachable inference service, capacity and
+rate limits, and evaluation of suggestion quality. Prompts guide wording but do
+not guarantee useful suggestions. No fine-tuning is performed.
