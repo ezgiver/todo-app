@@ -5,6 +5,12 @@ A small full-stack todo app.
 - **Backend** — Flask + SQLAlchemy + SQLite ([backend/](backend/))
 - **Frontend** — React 19 + Vite ([frontend/](frontend/))
 
+## Design and change history
+
+See the [documentation guide](docs/README.md) for technical specs, architecture
+decisions, and how we record evidence. See the [changelog](CHANGELOG.md) for
+unreleased and released changes.
+
 ## Quick start (Docker, recommended)
 
 ```bash

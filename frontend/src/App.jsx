@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { AuthForm } from './components/AuthForm'
+import { NextStep } from './components/NextStep'
 import { TodoForm } from './components/TodoForm'
 import { TodoList } from './components/TodoList'
 import { useAuth } from './hooks/useAuth'
@@ -91,6 +92,7 @@ export default function App() {
         </p>
       </header>
 
+      <NextStep onAdd={add} onUnauthorized={clearOn401} />
       <TodoForm onAdd={add} />
 
       <div className="todo-toolbar">
