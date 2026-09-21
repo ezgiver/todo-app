@@ -20,3 +20,9 @@ Earlier releases have not been reconstructed. Unreleased does not mean deployed.
 - Inference is configured for local use; public hosting is not implemented.
 - Model suggestions vary in usefulness; no fine-tuning or user-value validation
   has been completed.
+
+### Structured steps (in development)
+
+- Add schema-validated 1–3 AI steps with action and finish condition.
+- Let users edit and save individual steps, preserving both fields in the title.
+- Reject invalid and incomplete model responses without automatically retrying.

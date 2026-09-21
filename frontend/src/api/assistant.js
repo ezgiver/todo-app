@@ -7,3 +7,11 @@ export function suggestStep(task) {
     signal: AbortSignal.timeout(100000),
   })
 }
+
+export function suggestSteps(task) {
+  return request('/assistant/steps', {
+    method: 'POST',
+    body: JSON.stringify({ task }),
+    signal: AbortSignal.timeout(100000),
+  })
+}

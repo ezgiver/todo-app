@@ -616,3 +616,4 @@ input {
 .next-step button:disabled { cursor: default; opacity: .65; }
 .next-step-result { margin-top: 1rem; line-height: 1.6; }
 .next-step-result p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.next-step fieldset { display: grid; gap: .65rem; min-width: 0; border: 1px solid #94a3b8; border-radius: 8px; padding: 1rem; }

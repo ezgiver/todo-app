@@ -86,3 +86,16 @@ This is a local prototype. A deployed backend cannot reach your laptop through
 localhost. Public rollout requires a reachable inference service, capacity and
 rate limits, and evaluation of suggestion quality. Prompts guide wording but do
 not guarantee useful suggestions. No fine-tuning is performed.
+
+## Structured steps
+
+`POST /api/assistant/steps` accepts the same authenticated `{ "task": "..." }`
+request as next-step. Returns `{ "steps": [{ "action": "...", "done_when": "..." }] }`.
+There must be 1–3 steps, with nonblank strings up to 120 characters per field.
+Pydantic supplies the Ollama schema and independently validates the response;
+unknown fields and truncated generation are rejected with 503. Invalid input
+returns 400, missing authentication 401. No automatic retry or saving occurs.
+
+The UI edits and saves each step through the existing todo API as
+`action — Done when: done_when`. No database migration is required. The original
+`/api/assistant/next-step` contract remains available for compatibility.
