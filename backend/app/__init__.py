@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from .extensions import db
 from .routes.auth import auth_bp
+from .routes.assistant import assistant_bp
 from .routes.health import health_bp
 from .routes.todos import todos_bp
 
@@ -36,6 +37,7 @@ def create_app(config_object: str = "config.DevelopmentConfig") -> Flask:
         supports_credentials=True,
     )
 
+    app.register_blueprint(assistant_bp, url_prefix="/api/assistant")
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(health_bp, url_prefix="/api/health")
     app.register_blueprint(todos_bp, url_prefix="/api/todos")
