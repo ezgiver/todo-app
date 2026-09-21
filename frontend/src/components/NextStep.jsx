@@ -4,6 +4,8 @@ const valid = (s) => s.trim().length > 0 && [...s.trim()].length <= 120
 
 export function NextStep({ onAdd, onUnauthorized }) {
   const [task, setTask] = useState('')
+  const [blocker, setBlocker] = useState('')
+  const [minutes, setMinutes] = useState('')
   const [steps, setSteps] = useState([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -18,7 +20,7 @@ export function NextStep({ onAdd, onUnauthorized }) {
     pending.current = true
     setBusy(true); setError(''); setSteps([])
     try {
-      const result = await suggestSteps(task.trim())
+      const result = await suggestSteps(task.trim(), blocker.trim(), minutes)
       setSteps(result.steps.map((step) => ({ ...step, saved: false })))
     } catch (err) { failure(err) }
     finally { pending.current = false; setBusy(false) }
@@ -48,6 +50,13 @@ export function NextStep({ onAdd, onUnauthorized }) {
         <textarea id="stuck-task" value={task} maxLength={1000} required disabled={busy} rows={3}
           placeholder="For example: start working on my app"
           onChange={(event) => { setTask(event.target.value); setSteps([]); setError('') }} />
+        <label htmlFor="task-blocker">What makes starting difficult? (optional)</label>
+        <textarea id="task-blocker" value={blocker} maxLength={1000} disabled={busy} rows={2}
+          placeholder="For example: too many options to choose from"
+          onChange={(event) => { setBlocker(event.target.value); setSteps([]); setError('') }} />
+        <label htmlFor="task-minutes">Time available in minutes (optional)</label>
+        <input id="task-minutes" type="number" min="1" max="120" step="1" value={minutes} disabled={busy}
+          onChange={(event) => { setMinutes(event.target.value); setSteps([]); setError('') }} />
         <button disabled={busy || !task.trim()} type="submit">Suggest steps</button>
       </form>
       <p role="status" aria-live="polite">

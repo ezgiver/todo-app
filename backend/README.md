@@ -99,3 +99,10 @@ returns 400, missing authentication 401. No automatic retry or saving occurs.
 The UI edits and saves each step through the existing todo API as
 `action — Done when: done_when`. No database migration is required. The original
 `/api/assistant/next-step` contract remains available for compatibility.
+
+### Optional context
+
+`POST /api/assistant/steps` additionally accepts `blocker` (text up to 1000
+characters) and `available_minutes` (integer 1–120, or null/omitted). Old requests
+with only a task remain valid. Context informs the prompt; it does not guarantee
+that the model follows the time budget or generates useful advice.

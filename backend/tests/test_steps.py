@@ -18,7 +18,7 @@ def test_valid(client, register_and_login, count):
     assert r.json == {'steps': [STEP] * count}
     payload = json.loads(call.call_args.args[0].data)
     assert payload['format']['properties']['steps']['maxItems'] == 3
-    assert payload['messages'][-1]['content'] == 'Start'
+    assert json.loads(payload['messages'][-1]['content']) == {'task': 'Start'}
     assert client.get('/api/todos/').json == []
 
 @pytest.mark.parametrize('body', ['invalid', {'steps': []}, {'steps': [STEP] * 4}, {'steps': [{'action': 'x'}]}, {'steps': [{**STEP, 'extra': 'x'}]}, {'steps': [STEP], 'extra': True}, {'steps': [{**STEP, 'action': 4}]}, {'steps': [{**STEP, 'action': ' '}]}, {'steps': [{**STEP, 'done_when': 'x' * 121}]}])
@@ -58,3 +58,19 @@ def test_trim_and_save(client, register_and_login):
     r = client.post('/api/todos/', json={'title': title})
     assert r.status_code == 201
     assert r.json['title'] == title
+
+
+@pytest.mark.parametrize('extra', [{'blocker': None}, {'blocker': 3}, {'blocker': 'x' * 1001}, {'available_minutes': True}, {'available_minutes': 0}, {'available_minutes': 121}, {'available_minutes': 1.5}, {'available_minutes': '20'}])
+def test_invalid_context(client, register_and_login, extra):
+    register_and_login()
+    with patch('app.services.ollama.urlopen') as call:
+        assert client.post('/api/assistant/steps', json={'task': 'Start', **extra}).status_code == 400
+        call.assert_not_called()
+
+
+def test_context_reaches_model(client, register_and_login):
+    register_and_login()
+    with patch('app.services.ollama.urlopen', return_value=response(json.dumps({'steps': [STEP]}))) as call:
+        assert client.post('/api/assistant/steps', json={'task': 'Start', 'blocker': ' Too many choices ', 'available_minutes': 20}).status_code == 200
+    payload = json.loads(call.call_args.args[0].data)
+    assert json.loads(payload['messages'][-1]['content']) == {'task': 'Start', 'blocker': 'Too many choices', 'available_minutes': 20}

@@ -1,0 +1,140 @@
+{
+  "baseline_commit": "1cf5ce44229e8efdaa014f342618e5ecef232482",
+  "model": "llama2",
+  "settings": {
+    "temperature": 0.2,
+    "num_predict": 512
+  },
+  "method": "One run per case and version. Baseline sees task only; candidate also sees blocker/time. Combined prompt/context change, not an isolated prompt comparison. Human ratings pending.",
+  "cases": [
+    {
+      "task": "Do a 15 minute workout",
+      "blocker": "I do not know which moves to choose",
+      "available_minutes": 15,
+      "baseline": {
+        "result": {
+          "steps": [
+            {
+              "action": "Start exercising",
+              "done_when": "15 minutes have passed"
+            },
+            {
+              "action": "Continue exercising",
+              "done_when": "Another 10 minutes have passed"
+            },
+            {
+              "action": "Finish exercising",
+              "done_when": "The full 15 minutes have passed"
+            }
+          ]
+        },
+        "seconds": 4.75
+      },
+      "candidate": {
+        "result": {
+          "steps": [
+            {
+              "action": "Research different types of workouts",
+              "done_when": "You have identified 3-5 moves to include in your workout"
+            },
+            {
+              "action": "Choose the moves that best suit your fitness goals and available equipment",
+              "done_when": "You have created a 15-minute workout routine"
+            },
+            {
+              "action": "Start your workout and track your progress",
+              "done_when": "You have completed your 15-minute workout"
+            }
+          ]
+        },
+        "seconds": 3.34
+      }
+    },
+    {
+      "task": "Improve my technical skills",
+      "blocker": "Too many things to learn; I have a Flask app connected to Ollama",
+      "available_minutes": 20,
+      "baseline": {
+        "result": {
+          "steps": [
+            {
+              "action": "Research different programming languages and their applications",
+              "done_when": "You have a good understanding of the basics of at least 2 programming languages"
+            },
+            {
+              "action": "Practice coding exercises and problems on websites like HackerRank, LeetCode, etc.",
+              "done_when": "You have solved at least 50 coding challenges on these websites"
+            },
+            {
+              "action": "Work on a personal coding project, such as a simple web application or a game",
+              "done_when": "You have completed and deployed a working version of your project"
+            }
+          ]
+        },
+        "seconds": 2.84
+      },
+      "candidate": {
+        "result": {
+          "steps": [
+            {
+              "action": "Research Flask and Ollama",
+              "done_when": "You have a clear understanding of the technologies and their capabilities"
+            },
+            {
+              "action": "Prioritize the most important skills to learn for your app",
+              "done_when": "You have a list of prioritized skills and a plan to learn them"
+            },
+            {
+              "action": "Start learning the most important skills, focusing on one at a time",
+              "done_when": "You have made progress in learning one skill and are on track to achieve your goals"
+            }
+          ]
+        },
+        "seconds": 2.8
+      }
+    },
+    {
+      "task": "Cook a healthy and delicious meal",
+      "blocker": "Choosing a recipe and getting groceries",
+      "available_minutes": null,
+      "baseline": {
+        "result": {
+          "steps": [
+            {
+              "action": "Gather ingredients and cooking utensils",
+              "done_when": "You have all the necessary ingredients and utensils"
+            },
+            {
+              "action": "Chop vegetables and meat (if using)",
+              "done_when": "You have chopped all the vegetables and meat (if using)"
+            },
+            {
+              "action": "Cook the meal",
+              "done_when": "The meal is cooked and ready to be served"
+            }
+          ]
+        },
+        "seconds": 2.36
+      },
+      "candidate": {
+        "result": {
+          "steps": [
+            {
+              "action": "Open a recipe app or website",
+              "done_when": "Find a recipe that fits your dietary needs and ingredient availability"
+            },
+            {
+              "action": "Make a grocery list based on the selected recipe",
+              "done_when": "Have all necessary ingredients for the recipe"
+            },
+            {
+              "action": "Buy the necessary groceries",
+              "done_when": "Have all groceries for the recipe"
+            }
+          ]
+        },
+        "seconds": 2.42
+      }
+    }
+  ]
+}
